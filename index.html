@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Polka dot generator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --panel-bg: #fffdfb;
+    --panel-ink: #1e1b24;
+    --panel-muted: #6a6473;
+    --panel-line: #e4e0e8;
+    --field-bg: #f3f0f6;
+    --focus: #2f5bea;
+    --page-bg: #ffffff;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --panel-bg: #1d1b23;
+      --panel-ink: #f1eef6;
+      --panel-muted: #a8a2b3;
+      --panel-line: #37333f;
+      --field-bg: #2a2731;
+      --focus: #8fa8ff;
+      --page-bg: #14131a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --panel-bg: #1d1b23;
+    --panel-ink: #f1eef6;
+    --panel-muted: #a8a2b3;
+    --panel-line: #37333f;
+    --field-bg: #2a2731;
+    --focus: #8fa8ff;
+    --page-bg: #14131a;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html { height: 100%; scroll-padding-top: env(safe-area-inset-top, 0px); }
+  body {
+    height: 100%;
+    margin: 0;
+    background: var(--page-bg);
+    color: var(--panel-ink);
+    font-family: "Bricolage Grotesque", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 15px;
+    line-height: 1.4;
+  }
+
+  /* The pattern is the whole page */
+  .pattern { position: fixed; inset: 0; }
+
+  .panel {
+    position: fixed;
+    left: 16px;
+    top: calc(16px + env(safe-area-inset-top, 0px));
+    width: 320px;
+    max-height: calc(100% - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    overflow-y: auto;
+    padding: 20px 20px 22px;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-line);
+    border-radius: 18px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, .22);
+  }
+  .panel[hidden] { display: none; }
+
+  h1 {
+    margin: 0 0 18px;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    line-height: 1.1;
+  }
+
+  .group { margin-bottom: 18px; }
+  .group-title {
+    margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--panel-muted);
+  }
+
+  /* Palette presets */
+  .presets { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+  .preset {
+    aspect-ratio: 1;
+    border-radius: 50%;
+    border: 2px solid var(--panel-line);
+    padding: 0;
+    cursor: pointer;
+    background: radial-gradient(circle at 50% 50%, var(--d) 0 30%, var(--b) 32%);
+  }
+  .preset[aria-pressed="true"] { border-color: var(--panel-ink); box-shadow: 0 0 0 2px var(--panel-bg) inset; }
+
+  /* Color pickers */
+  .colors { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+  .color {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 10px 6px 6px;
+    background: var(--field-bg);
+    border-radius: 12px;
+    cursor: pointer;
+  }
+  .color input[type="color"] {
+    width: 34px; height: 34px; flex: none;
+    padding: 0; border: 0; border-radius: 8px;
+    background: none; cursor: pointer;
+  }
+  .color input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+  .color input[type="color"]::-webkit-color-swatch { border: 1px solid rgba(128,128,128,.4); border-radius: 8px; }
+  .color input[type="color"]::-moz-color-swatch { border: 1px solid rgba(128,128,128,.4); border-radius: 8px; }
+  .color span { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+  .color small { font-size: 12px; color: var(--panel-muted); }
+  .color b { font-weight: 600; font-size: 13px; font-variant-numeric: tabular-nums; }
+
+  /* Sliders */
+  .slider { margin-bottom: 12px; }
+  .slider-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+  .slider-head label { font-weight: 600; font-size: 14px; }
+  .slider-head output { color: var(--panel-muted); font-variant-numeric: tabular-nums; font-size: 13px; }
+  input[type="range"] { width: 100%; margin: 0; accent-color: var(--panel-ink); height: 28px; }
+
+  /* Segmented control */
+  .segmented { display: grid; grid-template-columns: 1fr 1fr; padding: 3px; background: var(--field-bg); border-radius: 12px; gap: 3px; }
+  .segmented button {
+    font: inherit; font-weight: 600; font-size: 14px;
+    padding: 8px 10px; border: 0; border-radius: 9px;
+    background: transparent; color: var(--panel-muted); cursor: pointer;
+  }
+  .segmented button[aria-pressed="true"] { background: var(--panel-bg); color: var(--panel-ink); box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+
+  /* Buttons */
+  .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .btn {
+    font: inherit; font-weight: 600; font-size: 14px;
+    padding: 11px 12px; border-radius: 12px; cursor: pointer;
+    border: 1px solid var(--panel-ink);
+    background: transparent; color: var(--panel-ink);
+  }
+  .btn.primary { background: var(--panel-ink); color: var(--panel-bg); }
+
+  /* CSS output */
+  .out { margin-top: 14px; }
+  .out label { display: block; font-size: 13px; font-weight: 600; color: var(--panel-muted); margin-bottom: 6px; }
+  textarea {
+    width: 100%; height: 132px; resize: vertical;
+    padding: 10px 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px; line-height: 1.5;
+    color: var(--panel-ink); background: var(--field-bg);
+    border: 1px solid var(--panel-line); border-radius: 10px;
+    white-space: pre; overflow: auto;
+  }
+  .status { min-height: 18px; margin: 6px 0 0; font-size: 13px; color: var(--panel-muted); }
+
+  /* Show / hide */
+  .toggle {
+    position: fixed;
+    right: 16px;
+    top: calc(16px + env(safe-area-inset-top, 0px));
+    font: inherit; font-weight: 600; font-size: 14px;
+    padding: 9px 14px; border-radius: 999px; cursor: pointer;
+    border: 1px solid var(--panel-line);
+    background: var(--panel-bg); color: var(--panel-ink);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, .18);
+  }
+
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+  @media (max-width: 640px) {
+    .panel {
+      left: 12px; right: 12px; top: auto;
+      bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+      width: auto;
+      max-height: 62%;
+      padding: 16px 16px 18px;
+    }
+    .toggle { right: 12px; top: calc(12px + env(safe-area-inset-top, 0px)); }
+  }
+</style>
+</head>
+<body>
+
+<div class="pattern" id="pattern" role="img" aria-label="Polka dot pattern preview"></div>
+
+<button class="toggle" id="toggle" type="button" aria-expanded="true" aria-controls="panel">Hide controls</button>
+
+<main class="panel" id="panel">
+  <h1>Polka dot generator</h1>
+
+  <section class="group" aria-labelledby="t-colors">
+    <h2 class="group-title" id="t-colors">Colors</h2>
+    <div class="presets" id="presets"></div>
+    <div class="colors">
+      <label class="color">
+        <input type="color" id="dot" value="#e4372a">
+        <span><small>Dots</small><b id="dotHex">#e4372a</b></span>
+      </label>
+      <label class="color">
+        <input type="color" id="bg" value="#ffffff">
+        <span><small>Background</small><b id="bgHex">#ffffff</b></span>
+      </label>
+    </div>
+  </section>
+
+  <section class="group" aria-labelledby="t-shape">
+    <h2 class="group-title" id="t-shape">Dots</h2>
+    <div class="slider">
+      <div class="slider-head"><label for="size">Dot size</label><output id="sizeOut" for="size"></output></div>
+      <input type="range" id="size" min="4" max="56" step="1" value="40">
+    </div>
+    <div class="slider">
+      <div class="slider-head"><label for="spacing">Spacing</label><output id="spacingOut" for="spacing"></output></div>
+      <input type="range" id="spacing" min="16" max="200" step="2" value="80">
+    </div>
+  </section>
+
+  <section class="group" aria-labelledby="t-layout">
+    <h2 class="group-title" id="t-layout">Layout</h2>
+    <div class="segmented" id="layout">
+      <button type="button" data-layout="staggered" aria-pressed="true">Staggered</button>
+      <button type="button" data-layout="grid" aria-pressed="false">Grid</button>
+    </div>
+  </section>
+
+  <div class="actions">
+    <button class="btn" type="button" id="shuffle">Shuffle colors</button>
+    <button class="btn primary" type="button" id="copy">Copy CSS</button>
+  </div>
+  <p class="status" id="status" role="status" aria-live="polite"></p>
+
+  <div class="out">
+    <label for="css">CSS</label>
+    <textarea id="css" readonly spellcheck="false"></textarea>
+  </div>
+</main>
+
+<script>
+(function () {
+  var PRESETS = [
+    { name: 'Tomato',    dot: '#e4372a', bg: '#ffffff' },
+    { name: 'Sailor',    dot: '#ffffff', bg: '#16306b' },
+    { name: 'Bubblegum', dot: '#f0508b', bg: '#ffe1ec' },
+    { name: 'Mustard',   dot: '#f5b82e', bg: '#3a1f4d' },
+    { name: 'Lagoon',    dot: '#1e9e7a', bg: '#d9f2e8' },
+    { name: 'Ink',       dot: '#1b1b1b', bg: '#e9e6df' }
+  ];
+
+  var state = { dot: '#e4372a', bg: '#ffffff', size: 40, spacing: 80, layout: 'staggered' };
+
+  var $ = function (id) { return document.getElementById(id); };
+  var pattern = $('pattern'), panel = $('panel'), toggle = $('toggle');
+  var dotIn = $('dot'), bgIn = $('bg'), sizeIn = $('size'), spacingIn = $('spacing');
+  var cssOut = $('css'), statusEl = $('status');
+  var presetsEl = $('presets');
+  var SQRT2 = Math.SQRT2;
+
+  function num(n) { return String(parseFloat(n.toFixed(2))); }
+
+  function maxSize() {
+    return state.layout === 'grid' ? state.spacing : Math.floor(state.spacing / SQRT2);
+  }
+
+  function buildCss() {
+    var r = state.size / 2;
+    var stop = 'radial-gradient(circle, ' + state.dot + ' ' + num(Math.max(r - 0.5, 0)) + 'px, transparent ' + num(r + 0.5) + 'px)';
+    var t = state.spacing, half = t / 2;
+    var lines = ['background-color: ' + state.bg + ';'];
+    if (state.layout === 'grid') {
+      lines.push('background-image: ' + stop + ';');
+      lines.push('background-size: ' + t + 'px ' + t + 'px;');
+    } else {
+      lines.push('background-image:');
+      lines.push('  ' + stop + ',');
+      lines.push('  ' + stop + ';');
+      lines.push('background-size: ' + t + 'px ' + t + 'px;');
+      lines.push('background-position: 0 0, ' + half + 'px ' + half + 'px;');
+    }
+    return lines.join('\n');
+  }
+
+  function render() {
+    // Keep dots from overlapping: clamp size to what fits the spacing.
+    var max = maxSize();
+    if (state.size > max) state.size = max;
+    sizeIn.max = max;
+    sizeIn.value = state.size;
+    spacingIn.value = state.spacing;
+    $('sizeOut').textContent = state.size + ' px';
+    $('spacingOut').textContent = state.spacing + ' px';
+
+    dotIn.value = state.dot; bgIn.value = state.bg;
+    $('dotHex').textContent = state.dot; $('bgHex').textContent = state.bg;
+
+    var css = buildCss();
+    cssOut.value = css;
+    pattern.removeAttribute('style');
+    css.split(/;\n?/).forEach(function (decl) {
+      var i = decl.indexOf(':');
+      if (i < 0) return;
+      var prop = decl.slice(0, i).trim();
+      var val = decl.slice(i + 1).replace(/\n\s*/g, ' ').trim();
+      if (prop) pattern.style.setProperty(prop, val);
+    });
+
+    Array.prototype.forEach.call(presetsEl.children, function (btn, i) {
+      var p = PRESETS[i];
+      btn.setAttribute('aria-pressed', String(p.dot === state.dot && p.bg === state.bg));
+    });
+    Array.prototype.forEach.call($('layout').children, function (btn) {
+      btn.setAttribute('aria-pressed', String(btn.dataset.layout === state.layout));
+    });
+  }
+
+  function say(msg) {
+    statusEl.textContent = msg;
+    clearTimeout(say.t);
+    say.t = setTimeout(function () { statusEl.textContent = ''; }, 2400);
+  }
+
+  // Presets
+  PRESETS.forEach(function (p) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'preset';
+    b.style.setProperty('--d', p.dot);
+    b.style.setProperty('--b', p.bg);
+    b.setAttribute('aria-label', p.name + ' palette');
+    b.title = p.name;
+    b.addEventListener('click', function () { state.dot = p.dot; state.bg = p.bg; render(); });
+    presetsEl.appendChild(b);
+  });
+
+  // Inputs
+  dotIn.addEventListener('input', function () { state.dot = dotIn.value.toLowerCase(); render(); });
+  bgIn.addEventListener('input', function () { state.bg = bgIn.value.toLowerCase(); render(); });
+  sizeIn.addEventListener('input', function () { state.size = parseInt(sizeIn.value, 10); render(); });
+  spacingIn.addEventListener('input', function () { state.spacing = parseInt(spacingIn.value, 10); render(); });
+  $('layout').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-layout]');
+    if (!b) return;
+    state.layout = b.dataset.layout;
+    render();
+  });
+
+  // Shuffle
+  function rand(a, b) { return a + Math.random() * (b - a); }
+  function hslToHex(h, s, l) {
+    h = ((h % 360) + 360) % 360; s /= 100; l /= 100;
+    var k = function (n) { return (n + h / 30) % 12; };
+    var a = s * Math.min(l, 1 - l);
+    var f = function (n) { return l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1))); };
+    return '#' + [f(0), f(8), f(4)].map(function (x) {
+      return Math.round(x * 255).toString(16).padStart(2, '0');
+    }).join('');
+  }
+  $('shuffle').addEventListener('click', function () {
+    var h = rand(0, 360);
+    if (Math.random() < 0.4) {
+      state.bg = hslToHex(h, rand(40, 60), rand(14, 22));
+      state.dot = hslToHex(h + rand(30, 180), rand(75, 95), rand(62, 74));
+    } else {
+      state.bg = hslToHex(h, rand(60, 90), rand(90, 95));
+      state.dot = hslToHex(h + rand(-30, 150), rand(65, 85), rand(42, 55));
+    }
+    render();
+  });
+
+  // Copy CSS
+  $('copy').addEventListener('click', function () {
+    var text = cssOut.value;
+    function fallback() {
+      cssOut.focus();
+      cssOut.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) {}
+      say(ok ? 'CSS copied' : 'CSS selected. Press Ctrl+C or Cmd+C to copy.');
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { say('CSS copied'); }, fallback);
+    } else {
+      fallback();
+    }
+  });
+
+  // Show / hide controls
+  toggle.addEventListener('click', function () {
+    var hide = !panel.hidden;
+    panel.hidden = hide;
+    toggle.textContent = hide ? 'Show controls' : 'Hide controls';
+    toggle.setAttribute('aria-expanded', String(!hide));
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
